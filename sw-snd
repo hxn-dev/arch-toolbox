@@ -1,0 +1,32 @@
+#!/usr/bin/node
+
+const { execSync } = require("child_process");
+
+let indexes = execSync("pactl list short sinks | awk '{print $1}'").toString().trim().split("\n")
+let states = execSync("pactl list short sinks | awk '{print $7}'").toString().trim().split("\n")
+let sink_name = execSync("pactl list short sinks | awk '{print $2}'").toString().trim().split("\n")
+let sinks = [] 
+
+indexes.map((index, i) => sinks.push({index: index, state: states[i], _name: sink_name[i]}))
+
+if (sinks.length === 1) {
+    console.log("Only one source found. exit now.")
+    process.exit(1)
+}
+
+for (let i = 0; i < sinks.length; i++) {
+    // After switching between two source the old one will have a state of "IDLE" for ~5 seconds
+    // If there is only 2 sources we don't want to wait 5 seconds
+    if (sinks.length == 2) {
+        if (sinks[i].state === "SUSPENDED" || sinks[i].state === "IDLE")
+            switchToSink(i)
+    } else {
+        if (sinks[i].state === "SUSPENDED")
+            switchToSink(i)
+    }
+}
+
+function switchToSink(i) {
+    execSync(`pacmd set-default-sink ${sinks[i].index}`)
+    console.log(`switched to ${sinks[i]._name}`)
+}
